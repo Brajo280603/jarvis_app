@@ -2,40 +2,59 @@ from ytmusicapi import YTMusic
 import subprocess
 import os
 
+SOCKET_PATH = "/tmp/mpv_socket"
+
+def _send_command(command):
+    """Sends a command to the running MPV instance via socket."""
+    try:
+        # echo 'cycle pause' | socat - /tmp/mpv_socket
+        cmd = f"echo '{command}' | socat - {SOCKET_PATH}"
+        subprocess.run(cmd, shell=True, stderr=subprocess.DEVNULL)
+        return True
+    except:
+        return False
+
 def play(query):
-    """
-    Searches YouTube Music and plays the first result using mpv.
-    """
+    """Searches and plays music with IPC socket enabled."""
     try:
         print(f"\n🎵 Searching for: {query}", flush=True)
         yt = YTMusic()
-        
-        # 1. Search for Songs only
         results = yt.search(query, filter="songs")
         
-        if not results:
-            return "I couldn't find that song."
+        if not results: return "I couldn't find that song."
 
-        # 2. Extract Data
         track = results[0]
         video_id = track['videoId']
         title = track['title']
-        artist = track['artists'][0]['name']
         url = f"https://music.youtube.com/watch?v={video_id}"
 
-        # 3. Kill any existing music (Simple Logic)
-        # We run 'pkill mpv' to stop the previous song before starting a new one
+        # 1. Kill old player
         subprocess.run(["pkill", "mpv"], stderr=subprocess.DEVNULL)
-
-        # 4. Spawn MPV in the Background
-        # --no-video: Audio only (saves massive CPU/RAM)
-        cmd = ["mpv", "--no-video", url]
         
-        # We use Popen so Jarvis DOES NOT freeze while the song plays
+        # 2. Start new player with Socket Control
+        # --input-ipc-server: Allows us to send commands later
+        cmd = [
+            "mpv", 
+            "--no-video", 
+            f"--input-ipc-server={SOCKET_PATH}", 
+            url
+        ]
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
-        return f"Playing **{title}** by **{artist}**."
-
+        return f"Playing **{title}**."
     except Exception as e:
-        print(f"❌ Music Error: {e}", flush=True)
-        return "Failed to play music."
+        return f"Error: {e}"
+
+def pause():
+    """Toggles Play/Pause."""
+    _send_command("cycle pause")
+    return "Music paused/resumed."
+
+def stop():
+    """Stops the music completely."""
+    # We use pkill for a hard stop, simpler than socket for quitting
+    subprocess.run(["pkill", "mpv"], stderr=subprocess.DEVNULL)
+    # Also clean up the socket file
+    if os.path.exists(SOCKET_PATH):
+        os.remove(SOCKET_PATH)
+    return "Music stopped."

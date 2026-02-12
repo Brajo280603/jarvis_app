@@ -4,8 +4,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 import config
 
 import ollama
-# Make sure 'search' is imported
-from skills import system, notes, search, youtube, music
+# Import the Registry instead of individual skills
+from skills import registry 
 
 class Brain:
     def __init__(self, memory_manager):
@@ -21,38 +21,40 @@ class Brain:
             response = ollama.chat(
                 model=self.router_model,
                 messages=[{'role': 'user', 'content': text}],
-                tools=config.TOOLS_SCHEMA
+                # Pass schema from Registry
+                tools=registry.TOOLS_SCHEMA
             )
             
             # Check for Tool Calls
             if response.message.tool_calls:
                 for tool in response.message.tool_calls:
-                    fn = tool.function.name
+                    fn_name = tool.function.name
                     args = tool.function.arguments
-                    print(f"⚙️ Calling: {fn} ({args})", flush=True)
+                    print(f"⚙️ Calling: {fn_name} ({args})", flush=True)
                     
-                    if fn == 'set_volume': return system.set_volume(args['level'])
-                    elif fn == 'set_brightness': return system.set_brightness(args['level'])
-                    elif fn == 'launch_app': return system.launch_app(args['app_name'])
-                    elif fn == 'add_note': return notes.add_note(args['content'])
-                    elif fn == 'summarize_video':
-                        transcript = youtube.get_transcript(args['url'])
-                        return self.chat(f"Summarize this: {transcript}")
-                    
-                    # --- SEARCH HANDLER ---
-                    elif fn == 'search_web':
-                        # 1. Execute Search
-                        result = search.search_web(args['query'])
+                    # --- DYNAMIC DISPATCH LOGIC ---
+                    if fn_name in registry.TOOLS_MAP:
+                        # 1. Get the function object
+                        func = registry.TOOLS_MAP[fn_name]
                         
-                        # 2. Feed result back to Brain
-                        return self.chat(f"SYSTEM: Using these search results, answer the user: {result}")
-                    # ----------------------
-
-                    elif fn == 'play_song':
-                        # Execute the play function
-                        result = music.play(args['query'])
-                        # Tell the user what is playing
-                        return self.chat(f"SYSTEM: The music has started. Tell the user: {result}")
+                        # 2. Run it (unpack args automatically)
+                        result = func(**args)
+                        
+                        # 3. Handle specific return types
+                        # (YouTube and Search need their output summarized by the Chat Brain)
+                        if fn_name in ['summarize_video', 'search_web']:
+                            return self.chat(f"SYSTEM: Using this data, answer the user: {result}")
+                        
+                        # (Music is a fire-and-forget action, just tell the user)
+                        elif fn_name == 'play_song':
+                            return self.chat(f"SYSTEM: Music started. Tell user: {result}")
+                            
+                        # (System commands just return a status string)
+                        else:
+                            return str(result)
+                    
+                    else:
+                        print(f"❌ Error: Tool '{fn_name}' not found in registry.")
 
         except Exception as e: 
             print(f"Router Error: {e}", flush=True)
