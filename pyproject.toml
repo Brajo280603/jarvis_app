@@ -11,4 +11,5 @@ dependencies = [
     "pyaudio>=0.2.14",
     "speechrecognition>=3.14.5",
     "youtube-transcript-api>=1.2.4",
+    "ytmusicapi>=1.11.5",
 ]

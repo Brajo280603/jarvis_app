@@ -81,5 +81,19 @@ TOOLS_SCHEMA = [
                 'required': ['query']
             }
         }
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'play_song',
+            'description': 'Play a song on Youtube Music',
+            'parameters':{
+                'type':'object',
+                'properties':{
+                    'query':{'type': 'string', 'description' : 'The song name'}
+                },
+                'required': ['query']
+            }
+        }
     }
 ]

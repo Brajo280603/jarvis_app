@@ -5,7 +5,7 @@ import config
 
 import ollama
 # Make sure 'search' is imported
-from skills import system, notes, youtube, search 
+from skills import system, notes, search, youtube, music
 
 class Brain:
     def __init__(self, memory_manager):
@@ -47,6 +47,12 @@ class Brain:
                         # 2. Feed result back to Brain
                         return self.chat(f"SYSTEM: Using these search results, answer the user: {result}")
                     # ----------------------
+
+                    elif fn == 'play_song':
+                        # Execute the play function
+                        result = music.play(args['query'])
+                        # Tell the user what is playing
+                        return self.chat(f"SYSTEM: The music has started. Tell the user: {result}")
 
         except Exception as e: 
             print(f"Router Error: {e}", flush=True)
